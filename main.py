@@ -4,8 +4,11 @@ from scapy.all import rdpcap, Raw
 
 import version
 import encryption
+import option
 
-pcap_file = '/home/kamada/capture_libssh/libssh-0.10.0-1.0.1u-install/sshd9.0-1.0.1u.dump'
+args = option.get_option()
+
+pcap_file = str(args.file)
 pcap = rdpcap(pcap_file)
 
 version.search_version(pcap)
