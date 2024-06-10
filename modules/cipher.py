@@ -15,15 +15,29 @@ def output_unencrypted(payload):
 
 # 各パケットの暗号化アルゴリズムを抽出して2次元配列に格納する関数
 def output_string(packets):
-    algorithms_list = []
+    server_algorithms_list = []
+    client_algorithms_list = []
+    cipher_list = []
     for packet in packets:
-        if packet.haslayer(Raw):
-            payload = packet[Raw].load
-            # 暗号化されていないアルゴリズムを抽出
-            unencrypted_algorithms = output_unencrypted(payload)
-            algorithms_list.append(unencrypted_algorithms)
-    algorithms_list = [algorithms for algorithms in algorithms_list if algorithms]
-    return algorithms_list
+        if packet.haslayer('TCP'):
+            src_ip = packet['IP'].src
+            if packet.haslayer(Raw):
+                payload = packet[Raw].load
+                # 暗号化されていない文字列を抽出
+                unencrypted_algorithms = output_unencrypted(payload)
+                if src_ip != "10.1.152.2":
+                    client_algorithms_list.append(unencrypted_algorithms)
+                else:
+                    server_algorithms_list.append(unencrypted_algorithms)
+    client_algorithms_list = [algorithms for algorithms in client_algorithms_list if algorithms]
+    server_algorithms_list = [algorithms for algorithms in server_algorithms_list if algorithms]
+    
+    for i, algorithms in enumerate(client_algorithms_list):
+        client_algorithms_list[i] = remove_duplicates_preserve_order(algorithms)
+        server_algorithms_list[i] = remove_duplicates_preserve_order(algorithms)
+        cipher_list.append(search_algorithm(client_algorithms_list[i],server_algorithms_list[i]))
+    return cipher_list
+
 
 # 重複を除去しつつ順序を保持する関数
 def remove_duplicates_preserve_order(lst):
@@ -36,13 +50,13 @@ def remove_duplicates_preserve_order(lst):
     return result
 
 #配列の要素同士で被っているものがあればそれを抽出する関数
-def search_algorithm(lst1,lst2):
-
-    for item in lst1:
-        if item in lst2:
+def search_algorithm(client,server):
+    for item in client:
+        if item in server:
             cipher = item
-            print(f"Cipher：{cipher}")
             break
+    return cipher
+  
 
 # 各パケットごとの暗号化されていないアルゴリズムを2次元配列に格納
 # algorithms_list = output_string(packets)
