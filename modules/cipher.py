@@ -14,7 +14,7 @@ def output_unencrypted(payload):
     return [algorithm.decode() for algorithm in unencrypted_algorithms]
 
 # 各パケットの暗号化アルゴリズムを抽出して2次元配列に格納する関数
-def output_string(packets):
+def output_string(packets,ip):
     server_algorithms_list = []
     client_algorithms_list = []
     cipher_list = []
@@ -25,7 +25,7 @@ def output_string(packets):
                 payload = packet[Raw].load
                 # 暗号化されていない文字列を抽出
                 unencrypted_algorithms = output_unencrypted(payload)
-                if src_ip != "10.1.152.2":
+                if src_ip != ip:
                     client_algorithms_list.append(unencrypted_algorithms)
                 else:
                     server_algorithms_list.append(unencrypted_algorithms)
