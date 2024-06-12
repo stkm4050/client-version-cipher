@@ -33,14 +33,14 @@ def output_string(packets,ip):
     server_algorithms_list = [algorithms for algorithms in server_algorithms_list if algorithms]
     
     for i, algorithms in enumerate(client_algorithms_list):
-        client_algorithms_list[i] = remove_duplicates_preserve_order(algorithms)
-        server_algorithms_list[i] = remove_duplicates_preserve_order(algorithms)
+        client_algorithms_list[i] = remove_duplicates(algorithms)
+        server_algorithms_list[i] = remove_duplicates(algorithms)
         cipher_list.append(search_algorithm(client_algorithms_list[i],server_algorithms_list[i]))
     return cipher_list
 
 
 # 重複を除去しつつ順序を保持する関数
-def remove_duplicates_preserve_order(lst):
+def remove_duplicates(lst):
     seen = set()
     result = []
     for item in lst:
