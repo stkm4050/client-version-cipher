@@ -88,27 +88,6 @@ local function get_cipher_info()
 	end
 end
 
-local function get_cipher()
-	for _, packet_info in ipairs(cipher_info) do
-		local server_port = packet_info[1]
-		local client_port = packet_info[0]
-		if server_port == "49538" then
-			for _, search_packet in ipairs(cipher_info) do
-				if search_packet[1] == client_port then
-					if not cipher_table[src_ip_str] then
-						client_table[src_ip_str] = {}
-						table.insert(client_table[src_ip_str], tostring(client()))
-						total_count = total_count + 1
-					else
-						table.insert(client_table[src_ip_str], tostring(client()))
-						total_count = total_count + 1
-					end
-					break
-				end
-			end
-		end
-	end
-
 local function calculate_percentages()
 	local percentages = {}
 	for version, count in pairs(client_version_counts) do
