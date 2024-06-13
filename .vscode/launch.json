@@ -1,0 +1,23 @@
+{
+    // IntelliSense を使用して利用可能な属性を学べます。
+    // 既存の属性の説明をホバーして表示します。
+    // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
+    
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "Debug Lua with Tshark",
+                "type": "lua-local",
+                "request": "launch",
+                "program": "/usr/bin/tshark", // tshark コマンドのパスを指定します
+                "args": [
+                    "-o", "ssh.tcp.port:10000,22,49538",
+                    "-X", "lua_script:get_ip_client.lua",
+                    "-X", "lua_script1:/home/kamada/searchVersion/regular-202406090000.dump",
+                    "-r", "/home/kamada/searchVersion/regular-202406090000.dump",
+                    "-q"
+                ]
+            }
+        ]
+    }
+        

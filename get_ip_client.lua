@@ -2,7 +2,7 @@
 -- Example: ls *.dump | xargs -I {} -P 1 sh -c "tshark -X lua_script:get_reset.lua -X lua_script1:{} -r {} -q"
 local args = { ... }
 local pcap_file = args[1]
-local client = Field.new("ssh.protocol")
+local version = Field.new("ssh.protocol")
 local src_ip = Field.new("ip.src")
 local dst_port_field = Field.new("tcp.dstport")
 local src_port_field = Field.new("tcp.srcport")
@@ -16,11 +16,37 @@ function string.starts(String, Start)
 end
 
 local ip_table = {}
-local client_table = {}
+local version_table = {}
 local client_version_counts = {}
-local cipher_info = {}
+local client_cipher_counts = {}
+local packet_info = {}
 local cipher_table = {}
-local total_count = 0
+local totatl_version_count = 0
+local total_cipher_count = 0
+
+local function search_algorithm(client,server)
+	local found_match = false
+
+	for i = 3, #client do
+        for j = 3, #server do
+            if client[i] == server[j] then
+                table.insert(cipher_table,client[i])
+				total_cipher_count = total_cipher_count + 1
+				if not client_cipher_counts[client[i]] then
+					client_cipher_counts[client[i]] = 1
+				else
+					client_cipher_counts[client[i]] = client_cipher_counts[client[i]] + 1
+				end
+				found_match = true
+				break
+            end
+        end
+		if found_match then
+			break
+		end
+    end
+end
+
 local function unique(t)
 	local uniqueElements = {}
 	if type(t) == "table" then
@@ -50,22 +76,22 @@ local function unique(t)
 	return result
 end
 
-local function get_client()
+local function get_client_version()
 	local src_ip_str = tostring(src_ip())
 	local dst_port_str = tostring(dst_port_field())
 	-- if src_ip_str does not start with 10.
 	-- if not string.starts(src_ip_str, "10.") then
-		if client() then
+		if version() then
 			if dst_port_str == "49538" then
-				local client_version = tostring(client())
+				local client_version = tostring(version())
 				--クライアントIPによる重複チェック
-				if not client_table[src_ip_str] then
-					client_table[src_ip_str] = {}
-					table.insert(client_table[src_ip_str], tostring(client()))
-					total_count = total_count + 1
+				if not version_table[src_ip_str] then
+					version_table[src_ip_str] = {}
+					table.insert(version_table[src_ip_str], tostring(version()))
+					totatl_version_count = totatl_version_count + 1
 				else
-					table.insert(client_table[src_ip_str], tostring(client()))
-					total_count = total_count + 1
+					table.insert(version_table[src_ip_str], tostring(version()))
+					totatl_version_count = totatl_version_count + 1
 				end
 
 				if not client_version_counts[client_version] then
@@ -78,37 +104,65 @@ local function get_client()
 	-- end
 end
 
-local function get_cipher_info()
+local function get_packet_info()
 	local client_cipher = client_cipher_field()
 	local dst_port = dst_port_field()
 	local src_port = src_port_field()
 
 	if client_cipher then
-		cipher_info[#cipher_info + 1] ={src_port(),dst_port(),client_cipher()}
+		packet_info[#packet_info + 1] ={src_port(),dst_port(),client_cipher()}
 	end
 end
 
-local function calculate_percentages()
+local function get_cipher()
+	
+	for _, packet in ipairs(packet_info) do
+		for cipher in packet[3]:gmatch("[^,]+") do
+			table.insert(packet,cipher)
+		end
+		table.remove(packet,3)
+	end
+
+	for _, client_cipher_list in ipairs(packet_info) do
+		if client_cipher_list[2] == 49538 then
+			for _, server_cipher_list in ipairs(packet_info) do
+				if client_cipher_list[1] == server_cipher_list[2] then
+					search_algorithm(client_cipher_list,server_cipher_list)
+				end
+			end
+		end
+	end
+end
+
+local function calculate_percentages(index,allCount)
 	local percentages = {}
-	for version, count in pairs(client_version_counts) do
-		percentages[version] = (count / total_count) * 100
+	for version, count in pairs(index) do
+		percentages[version] = (count / allCount) * 100
 	end
 	return percentages
 end
 
 function tap.packet(pinfo, tvb, tapdata) --1packet毎に行われる処理
-	get_client()
-	get_cipher_info()
+	get_client_version()
+	get_packet_info()
 end
 function tap.draw() end
 function tap.reset()
-	for k, v in pairs(client_table) do
+	for k, v in pairs(version_table) do
 		local unique_v = unique(v)
 		print(k .. "," .. table.concat(unique_v, ","))
 	end
+	--cipherリストの出力
+	get_cipher()
+
 	-- クライアントデータの集計後に割合を表示
-	local client_percentages = calculate_percentages()
-		for version, percentage in pairs(client_percentages) do
-			print(string.format("Version: %s, Percentage: %.2f%%", version, percentage))
-		end
+	local client_version_percentages = calculate_percentages(client_version_counts,totatl_version_count)
+	for version, percentage in pairs(client_version_percentages) do
+		print(string.format("Version: %s, Percentage: %.2f%%", version, percentage))
+	end
+	local client_cipher_percentegaes = calculate_percentages(client_cipher_counts,total_cipher_count)
+	for cipher, percentages in pairs(client_cipher_percentegaes) do
+		print(string.format("Cipher: %s, Percentage: %.2f%%",cipher,percentages))
+	end
+
 end
