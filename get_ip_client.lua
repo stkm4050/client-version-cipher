@@ -2,6 +2,7 @@
 -- Example: ls *.dump | xargs -I {} -P 1 sh -c "tshark -X lua_script:get_reset.lua -X lua_script1:{} -r {} -q"
 local args = { ... }
 local pcap_file = args[1]
+local ssh_port = tonumber(args[2])
 local version = Field.new("ssh.protocol")
 local src_ip = Field.new("ip.src")
 local dst_port_field = Field.new("tcp.dstport")
@@ -9,8 +10,9 @@ local src_port_field = Field.new("tcp.srcport")
 local client_cipher_field = Field.new("ssh.encryption_algorithms_client_to_server")
 local server_cipher_field = Field.new("ssh.encryption_algorithms_server_to_client")
 
+
 -- local tap = Listener.new(nil, "ssh") --port 22を見る設定←ここを特定のものに変更する必要がる
-local tap = Listener.new(nil, "tcp.port == 49538 or tcp.port == 10000 or tcp.port == 22") --変更のテスト中
+local tap = Listener.new(nil, "tcp.port == 49539 or tcp.port == 10000 or tcp.port == 22") --変更のテスト中
 function string.starts(String, Start)
 	return string.sub(String, 1, string.len(Start)) == Start
 end
@@ -82,7 +84,7 @@ local function get_client_version()
 	-- if src_ip_str does not start with 10.
 	-- if not string.starts(src_ip_str, "10.") then
 		if version() then
-			if dst_port_str == "49538" then
+			if dst_port_str == tostring(ssh_port) then
 				local client_version = tostring(version())
 				--クライアントIPによる重複チェック
 				if not version_table[src_ip_str] then
@@ -124,7 +126,7 @@ local function get_cipher()
 	end
 
 	for _, client_cipher_list in ipairs(packet_info) do
-		if client_cipher_list[2] == 49538 then
+		if client_cipher_list[2] == ssh_port then
 			for _, server_cipher_list in ipairs(packet_info) do
 				if client_cipher_list[1] == server_cipher_list[2] then
 					search_algorithm(client_cipher_list,server_cipher_list)
