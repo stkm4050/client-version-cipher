@@ -1,8 +1,10 @@
--- Usage: tshark -X lua_script:stream.lua -X lua_script1:<capture file> -r <capture file>
+-- Usage: tshark -X lua_script:search_client.lua -X lua_script1:<capture file> -r <capture file>
 -- Example: ls *.dump | xargs -I {} -P 1 sh -c "tshark -X lua_script:get_reset.lua -X lua_script1:{} -r {} -q"
 local args = { ... }
 local pcap_file = args[1]
 local ssh_port = tonumber(args[2])
+local version_file_name = args[3] or "version_list.csv"
+local cipher_file_name = args[4] or "cipher_list.csv"
 local version = Field.new("ssh.protocol")
 local src_ip = Field.new("ip.src")
 local dst_port_field = Field.new("tcp.dstport")
@@ -10,12 +12,7 @@ local src_port_field = Field.new("tcp.srcport")
 local client_cipher_field = Field.new("ssh.encryption_algorithms_client_to_server")
 local server_cipher_field = Field.new("ssh.encryption_algorithms_server_to_client")
 
-
--- local tap = Listener.new(nil, "ssh") --port 22を見る設定←ここを特定のものに変更する必要がる
-local tap = Listener.new(nil, "tcp.port == 49539 or tcp.port == 10000 or tcp.port == 22") --変更のテスト中
-function string.starts(String, Start)
-	return string.sub(String, 1, string.len(Start)) == Start
-end
+local tap = Listener.new(nil, "tcp.port =="..ssh_port ) 
 
 local ip_table = {}
 local version_table = {}
@@ -26,6 +23,13 @@ local cipher_table = {}
 local totatl_version_count = 0
 local total_cipher_count = 0
 
+local version_file = io.open(version_file_name, "w")
+local cipher_file = io.open(cipher_file_name, "w")
+
+version_file:write("SSHVersion,Percentage\n")
+cipher_file:write("Cipher,Percentage\n")
+
+--２つのcipherが記述された配列を比較して合致するものを抽出する関数
 local function search_algorithm(client,server)
 	local found_match = false
 
@@ -49,35 +53,7 @@ local function search_algorithm(client,server)
     end
 end
 
-local function unique(t)
-	local uniqueElements = {}
-	if type(t) == "table" then
-		for k, v in pairs(t) do
-			if not uniqueElements[v] then
-				uniqueElements[v] = true
-			end
-		end
-	elseif type(t) == "userdata" and t:dim() == 1 then
-		for i = 1, t:size(1) do
-			uniqueElements[t[i]] = true
-		end
-	elseif type(t) == "userdata" and t:dim() == 2 then
-		for r = 1, t:size(1) do
-			for c = 1, t:size(2) do
-				uniqueElements[t[r][c]] = true
-			end
-		end
-	else
-		error("bad type or dim for t; type(t) = " .. type(t))
-	end
-	local result = {}
-	for k, v in pairs(uniqueElements) do
-		table.insert(result, k)
-	end
-
-	return result
-end
-
+--sshバージョンを取得する関数
 local function get_client_version()
 	local src_ip_str = tostring(src_ip())
 	local dst_port_str = tostring(dst_port_field())
@@ -106,6 +82,7 @@ local function get_client_version()
 	-- end
 end
 
+--パケット事のsrcIP,dstIP,cipherを一つの配列にまとめる関数
 local function get_packet_info()
 	local client_cipher = client_cipher_field()
 	local dst_port = dst_port_field()
@@ -116,6 +93,7 @@ local function get_packet_info()
 	end
 end
 
+--cipherを取得する関数
 local function get_cipher()
 	
 	for _, packet in ipairs(packet_info) do
@@ -136,6 +114,7 @@ local function get_cipher()
 	end
 end
 
+--各バージョン，cipherの割合を出力する関数
 local function calculate_percentages(index,allCount)
 	local percentages = {}
 	for version, count in pairs(index) do
@@ -148,23 +127,21 @@ function tap.packet(pinfo, tvb, tapdata) --1packet毎に行われる処理
 	get_client_version()
 	get_packet_info()
 end
-function tap.draw() end
+-- function tap.draw() end
 function tap.reset()
-	for k, v in pairs(version_table) do
-		local unique_v = unique(v)
-		print(k .. "," .. table.concat(unique_v, ","))
-	end
 	--cipherリストの出力
 	get_cipher()
 
 	-- クライアントデータの集計後に割合を表示
 	local client_version_percentages = calculate_percentages(client_version_counts,totatl_version_count)
 	for version, percentage in pairs(client_version_percentages) do
-		print(string.format("Version: %s, Percentage: %.2f%%", version, percentage))
+		version_file:write(string.format("%s,%.2f\n",version,percentage))
 	end
 	local client_cipher_percentegaes = calculate_percentages(client_cipher_counts,total_cipher_count)
-	for cipher, percentages in pairs(client_cipher_percentegaes) do
-		print(string.format("Cipher: %s, Percentage: %.2f%%",cipher,percentages))
+	for cipher, percentage in pairs(client_cipher_percentegaes) do
+		cipher_file:write(string.format("%s,%.2f\n",cipher,percentage))
 	end
 
+	cipher_file:close()
+	version_file:close()
 end

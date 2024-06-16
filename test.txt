@@ -1,6 +1,0 @@
-Version:libssh_0.9.6
-Cipher:aes256-gcm@openssh.com
-Version:OpenSSH_9.0
-Cipher:chacha20-poly1305@openssh.com
-Version:OpenSSH_9.0
-Cipher:chacha20-poly1305@openssh.com
