@@ -1,0 +1,13 @@
+SSHversion,Percentage,Cipher,Percentage
+SSH-2.0-libssh_0.9.6,48.26,aes128-gcm@openssh.com,21.27
+SSH-2.0-Go,21.08,aes128-ctr,26.18
+SSH-2.0-paramiko_2.12.0,0.58,aes256-gcm@openssh.com,52.55
+SSH-2.0-OpenSSH_8.9p19,0.30,,
+SSH-2.0-ZGrab ZGrab SSH Survey,0.06,,
+SSH-2.0-OpenSSH_9.0,0.01,,
+SSH-2.0-OpenSSH_for_Windows_8.6,0.01,,
+SSH-2.0-libssh_0.7.4,0.01,,
+SSH-2.0-libssh_0.10.5,0.79,,
+SSH-2.0-libssh2_1.4.3,0.03,,
+SSH-2.0-libssh2_1.11.0,1.16,,
+SSH-2.0-PUTTY,27.70,,

@@ -1,10 +1,8 @@
--- Usage: tshark -X lua_script:search_client.lua -X lua_script1:<capture file> -r <capture file>
--- Example: ls *.dump | xargs -I {} -P 1 sh -c "tshark -X lua_script:get_reset.lua -X lua_script1:{} -r {} -q"
+-- Usage: tshark  -o "ssh.tcp.port:<port>" -X lua_script:get_ip_client.lua -X lua_script1:<capture file> -X lua_script1:<port> -X lua_script1:<save file>  -r <capture file> -q
 local args = { ... }
 local pcap_file = args[1]
 local ssh_port = tonumber(args[2])
-local version_file_name = args[3] or "version_list.csv"
-local cipher_file_name = args[4] or "cipher_list.csv"
+local file_name = args[3] or "list.csv"
 local version = Field.new("ssh.protocol")
 local src_ip = Field.new("ip.src")
 local dst_port_field = Field.new("tcp.dstport")
@@ -23,35 +21,8 @@ local cipher_table = {}
 local totatl_version_count = 0
 local total_cipher_count = 0
 
-local version_file = io.open(version_file_name, "w")
-local cipher_file = io.open(cipher_file_name, "w")
-
-version_file:write("SSHVersion,Percentage\n")
-cipher_file:write("Cipher,Percentage\n")
-
---２つのcipherが記述された配列を比較して合致するものを抽出する関数
-local function search_algorithm(client,server)
-	local found_match = false
-
-	for i = 3, #client do
-        for j = 3, #server do
-            if client[i] == server[j] then
-                table.insert(cipher_table,client[i])
-				total_cipher_count = total_cipher_count + 1
-				if not client_cipher_counts[client[i]] then
-					client_cipher_counts[client[i]] = 1
-				else
-					client_cipher_counts[client[i]] = client_cipher_counts[client[i]] + 1
-				end
-				found_match = true
-				break
-            end
-        end
-		if found_match then
-			break
-		end
-    end
-end
+local output_file = io.open(file_name, "w")
+output_file:write("SSHversion,Percentage,Cipher,Percentage\n")
 
 --sshバージョンを取得する関数
 local function get_client_version()
@@ -80,6 +51,30 @@ local function get_client_version()
 			end
 		end
 	-- end
+end
+
+--２つのcipherが記述された配列を比較して合致するものを抽出する関数
+local function search_algorithm(client,server)
+	local found_match = false
+
+	for i = 3, #client do
+        for j = 3, #server do
+            if client[i] == server[j] then
+                table.insert(cipher_table,client[i])
+				total_cipher_count = total_cipher_count + 1
+				if not client_cipher_counts[client[i]] then
+					client_cipher_counts[client[i]] = 1
+				else
+					client_cipher_counts[client[i]] = client_cipher_counts[client[i]] + 1
+				end
+				found_match = true
+				break
+            end
+        end
+		if found_match then
+			break
+		end
+    end
 end
 
 --パケット事のsrcIP,dstIP,cipherを一つの配列にまとめる関数
@@ -123,6 +118,16 @@ local function calculate_percentages(index,allCount)
 	return percentages
 end
 
+--割合の多い順に並び替える関数
+local function sort_percentages(percentages_table)
+	local sorted_percentages_table = {}
+	for key, percentage in pairs(percentages_table) do
+		table.insert(sorted_percentages_table, {key=key,percentage=percentage})
+	end
+	table.sort(sorted_percentages_table, function(a,b) return a.percentage > b.percentage end)
+	return sorted_percentages_table
+end
+
 function tap.packet(pinfo, tvb, tapdata) --1packet毎に行われる処理
 	get_client_version()
 	get_packet_info()
@@ -134,14 +139,24 @@ function tap.reset()
 
 	-- クライアントデータの集計後に割合を表示
 	local client_version_percentages = calculate_percentages(client_version_counts,totatl_version_count)
-	for version, percentage in pairs(client_version_percentages) do
-		version_file:write(string.format("%s,%.2f\n",version,percentage))
-	end
 	local client_cipher_percentegaes = calculate_percentages(client_cipher_counts,total_cipher_count)
-	for cipher, percentage in pairs(client_cipher_percentegaes) do
-		cipher_file:write(string.format("%s,%.2f\n",cipher,percentage))
-	end
 
-	cipher_file:close()
-	version_file:close()
+	--割合の多い順に並び替え
+	local sorted_versions = sort_percentages(client_version_percentages)
+	local sorted_ciphers = sort_percentages(client_cipher_percentegaes)
+
+	for i, version_data in ipairs(sorted_versions) do
+		local version = version_data.key
+		local version_percentage = version_data.percentage
+		local cipher = ""
+		local cipher_percentage = 0
+		
+		if sorted_ciphers[i] then
+			cipher = sorted_ciphers[i].key
+			cipher_percentage = sorted_ciphers[i].percentage
+		end
+		
+		output_file:write(string.format("%s,%.2f,%s,%.2f\n", version, version_percentage, cipher, cipher_percentage))
+	end
+	output_file:close()
 end

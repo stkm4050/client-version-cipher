@@ -1,0 +1,17 @@
+SSHversion,Percentage,Cipher,Percentage
+SSH-2.0-PUTTY,72.70,aes128-ctr,78.94
+SSH-2.0-paramiko_2.12.0,1.54,aes128-gcm@openssh.com,20.11
+SSH-1.5-Server,0.04,chacha20-poly1305@openssh.com,0.08
+SSH-2.0-libssh2_1.4.3,0.24,aes256-gcm@openssh.com,0.87
+SSH-2.0-OpenSSH_7.4,0.04,,
+SSH-2.0-libssh2_1.11.0,0.08,,
+SSH-2.0-OpenSSH_9.0,0.16,,
+SSH-2.0-ZGrab ZGrab SSH Survey,0.16,,
+SSH-2.0-Go,18.89,,
+SSH-2.0-libssh2_1.8.2,0.40,,
+SSH-2.0-OpenSSH_8.4p1 Raspbian-5+b1,0.08,,
+SSH-2.0-libssh2_1.9.0,0.47,,
+SSH-2.0-libssh_0.10.5,0.91,,
+SSH-2.0-libssh-0.2,3.83,,
+SSH-2.0-libssh-0.1,0.08,,
+SSH-2.0-OpenSSH_8.9p19,0.40,,
