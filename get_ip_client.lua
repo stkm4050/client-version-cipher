@@ -149,14 +149,17 @@ function tap.reset()
 		local version = version_data.key
 		local version_percentage = version_data.percentage
 		local cipher = ""
-		local cipher_percentage = 0
+		local cipher_percentage 
 		
 		if sorted_ciphers[i] then
 			cipher = sorted_ciphers[i].key
 			cipher_percentage = sorted_ciphers[i].percentage
+			output_file:write(string.format("%s,%.2f,%s,%.2f\n", version, version_percentage, cipher, cipher_percentage))
+		else
+			output_file:write(string.format("%s,%.2f,%s,%s\n", version,version_percentage,"",""))
 		end
 		
-		output_file:write(string.format("%s,%.2f,%s,%.2f\n", version, version_percentage, cipher, cipher_percentage))
+		
 	end
 	output_file:close()
 end
