@@ -13,7 +13,6 @@ local server_cipher_field = Field.new("ssh.encryption_algorithms_server_to_clien
 local tap = Listener.new(nil, "tcp.port =="..ssh_port ) 
 
 local ip_table = {}
-local version_table = {}
 local client_version_counts = {}
 local client_cipher_counts = {}
 local packet_info = {}
@@ -21,31 +20,27 @@ local cipher_table = {}
 local totatl_version_count = 0
 local total_cipher_count = 0
 
+--クライアントバージョンごとのCipher割合のための変数
+local version_list = {}
+local cipher_list = {}
+
 local output_file = io.open(file_name, "w")
-output_file:write("SSHversion,Percentage,Cipher,Percentage\n")
 
 --sshバージョンを取得する関数
 local function get_client_version()
-	local src_ip_str = tostring(src_ip())
 	local dst_port_str = tostring(dst_port_field())
 	-- if src_ip_str does not start with 10.
 	-- if not string.starts(src_ip_str, "10.") then
 		if version() then
 			if dst_port_str == tostring(ssh_port) then
 				local client_version = tostring(version())
-				--クライアントIPによる重複チェック
-				if not version_table[src_ip_str] then
-					version_table[src_ip_str] = {}
-					table.insert(version_table[src_ip_str], tostring(version()))
-				else
-					table.insert(version_table[src_ip_str], tostring(version()))		
-				end
 				totatl_version_count = totatl_version_count + 1
 				if not client_version_counts[client_version] then
 					client_version_counts[client_version] = 1
 				else
 					client_version_counts[client_version] = client_version_counts[client_version] + 1
 				end
+				version_list[#version_list+1] ={ tostring(src_ip()),tostring(src_port_field()),version()}
 			end
 		end
 	-- end
@@ -65,6 +60,7 @@ local function search_algorithm(client,server)
 				else
 					client_cipher_counts[client[i]] = client_cipher_counts[client[i]] + 1
 				end
+				cipher_list[#cipher_list+1] ={ tostring(src_ip()),tostring(src_port_field()),client[i]}
 				found_match = true
 				break
             end
@@ -80,9 +76,10 @@ local function get_packet_info()
 	local client_cipher = client_cipher_field()
 	local dst_port = dst_port_field()
 	local src_port = src_port_field()
+	local src_ip_str = tostring(src_ip())
 
 	if client_cipher then
-		packet_info[#packet_info + 1] ={src_port(),dst_port(),client_cipher()}
+		packet_info[#packet_info + 1] ={src_ip_str(),src_port(),dst_port(),client_cipher()}
 	end
 end
 
@@ -90,16 +87,16 @@ end
 local function get_cipher()
 	
 	for _, packet in ipairs(packet_info) do
-		for cipher in packet[3]:gmatch("[^,]+") do
+		for cipher in packet[4]:gmatch("[^,]+") do
 			table.insert(packet,cipher)
 		end
-		table.remove(packet,3)
+		table.remove(packet,4)
 	end
 
 	for i, client_cipher_list in ipairs(packet_info) do
-		if client_cipher_list[2] == ssh_port then
+		if client_cipher_list[3] == ssh_port then
 			for j, server_cipher_list in ipairs(packet_info) do
-				if client_cipher_list[1] == server_cipher_list[2] then
+				if client_cipher_list[2] == server_cipher_list[3] then
 					search_algorithm(client_cipher_list,server_cipher_list)
 					table.remove(packet_info,i)
 					table.remove(packet_info,j)
@@ -129,6 +126,15 @@ local function sort_percentages(percentages_table)
 	return sorted_percentages_table
 end
 
+--クライアントバージョン毎のCipherの割合調査
+local function set_version_cipher()
+	for i in ipairs(cipher_list) do
+		if version_list[i][1]==cipher_list[i][1] and version_list[i][2]==cipher_list[i][2] then
+			version_list[i][4] =cipher_list[i][3]
+		end
+	end
+end
+
 function tap.packet(pinfo, tvb, tapdata) --1packet毎に行われる処理
 	get_client_version()
 	get_packet_info()
@@ -142,25 +148,9 @@ function tap.reset()
 	local client_version_percentages = calculate_percentages(client_version_counts,totatl_version_count)
 	local client_cipher_percentegaes = calculate_percentages(client_cipher_counts,total_cipher_count)
 
-	--割合の多い順に並び替え
-	local sorted_versions = sort_percentages(client_version_percentages)
-	local sorted_ciphers = sort_percentages(client_cipher_percentegaes)
-
-	for i, version_data in ipairs(sorted_versions) do
-		local version = version_data.key
-		local version_percentage = version_data.percentage
-		local cipher = ""
-		local cipher_percentage 
-		
-		if sorted_ciphers[i] then
-			cipher = sorted_ciphers[i].key
-			cipher_percentage = sorted_ciphers[i].percentage
-			output_file:write(string.format("%s,%.2f,%s,%.2f\n", version, version_percentage, cipher, cipher_percentage))
-		else
-			output_file:write(string.format("%s,%.2f,%s,%s\n", version,version_percentage,"",""))
-		end
-		
-		
+	set_version_cipher()
+	for i in ipairs(version_list) do
+			output_file:write(string.format("%s,%s\n",version_list[i][3],version_list[i][4]))		
 	end
 	output_file:close()
 end
