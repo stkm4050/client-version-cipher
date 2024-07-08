@@ -23,8 +23,11 @@ local total_cipher_count = 0
 --クライアントバージョンごとのCipher割合のための変数
 local version_list = {}
 local cipher_list = {}
+local version_cipher_counts = {}
+local version_counts = {}
 
 local output_file = io.open(file_name, "w")
+output_file:write("SSHversion-Cipher,percentage\n")
 
 --sshバージョンを取得する関数
 local function get_client_version()
@@ -40,7 +43,8 @@ local function get_client_version()
 				else
 					client_version_counts[client_version] = client_version_counts[client_version] + 1
 				end
-				version_list[#version_list+1] ={ tostring(src_ip()),tostring(src_port_field()),version()}
+				version_list[#version_list+1] ={ tostring(src_ip()),tostring(src_port_field()),tostring(version())}
+				
 			end
 		end
 	-- end
@@ -50,8 +54,8 @@ end
 local function search_algorithm(client,server)
 	local found_match = false
 
-	for i = 3, #client do
-        for j = 3, #server do
+	for i = 4, #client do
+        for j = 4, #server do
             if client[i] == server[j] then
                 table.insert(cipher_table,client[i])
 				total_cipher_count = total_cipher_count + 1
@@ -60,7 +64,7 @@ local function search_algorithm(client,server)
 				else
 					client_cipher_counts[client[i]] = client_cipher_counts[client[i]] + 1
 				end
-				cipher_list[#cipher_list+1] ={ tostring(src_ip()),tostring(src_port_field()),client[i]}
+				cipher_list[#cipher_list+1] ={client[1],client[2],client[i]}
 				found_match = true
 				break
             end
@@ -76,10 +80,9 @@ local function get_packet_info()
 	local client_cipher = client_cipher_field()
 	local dst_port = dst_port_field()
 	local src_port = src_port_field()
-	local src_ip_str = tostring(src_ip())
 
 	if client_cipher then
-		packet_info[#packet_info + 1] ={src_ip_str(),src_port(),dst_port(),client_cipher()}
+		packet_info[#packet_info + 1] ={tostring(src_ip()),src_port(),dst_port(),client_cipher()}
 	end
 end
 
@@ -127,13 +130,63 @@ local function sort_percentages(percentages_table)
 end
 
 --クライアントバージョン毎のCipherの割合調査
+local function version_cipher_parcent()
+	local percentages = {}
+	for versions_key, cipher_data in pairs(version_cipher_counts) do
+        for cipher_key, counts in pairs(cipher_data) do
+			for version_key, count in pairs(version_counts) do
+				if versions_key == version_key then
+					percentages[version_key.."-"..cipher_key] = (counts/count)*100
+				end
+			end
+        end
+    end
+	local newpercentages = sort_percentages(percentages)
+	for _, data in pairs(newpercentages) do
+		-- print(string.format("Version-cipher: %s, percent: %.2f\n",version,percent))
+		output_file:write(string.format("%s,%.2f\n",data.key,data.percentage))
+	end
+
+end
+
+--クライアントバージョン毎のCipherを算出
 local function set_version_cipher()
-	for i in ipairs(cipher_list) do
-		if version_list[i][1]==cipher_list[i][1] and version_list[i][2]==cipher_list[i][2] then
-			version_list[i][4] =cipher_list[i][3]
+	local k = 1
+	for i in ipairs(version_list) do
+		for j in ipairs(cipher_list) do
+			if version_list[i][1] == cipher_list[j][1] then
+				if version_list[i][2] == tostring(cipher_list[j][2]) then
+
+					local version_key = version_list[i][3]
+					if not version_cipher_counts[version_key] then
+						version_cipher_counts[version_key] = {}
+						version_counts[version_key] = 1
+					else
+						version_counts[version_key] = version_counts[version_key] + 1
+					end
+
+					local cipher_key = cipher_list[j][3]
+					if not version_cipher_counts[version_key][cipher_key] then
+						version_cipher_counts[version_key][cipher_key] = 1
+					else
+						version_cipher_counts[version_key][cipher_key] = version_cipher_counts[version_key][cipher_key] + 1
+					end
+			
+					-- print(version_key)
+					-- print(cipher_key)
+					-- print(version_cipher_counts[version_key][cipher_key])
+
+					version_list[i][1]=("No Version")
+					version_list[i][2]=("No Version port")
+					cipher_list[j][1]=("No Cipher")
+					cipher_list[j][2]=("No Cipher port")
+				end
+			end
 		end
 	end
+	version_cipher_parcent()
 end
+
 
 function tap.packet(pinfo, tvb, tapdata) --1packet毎に行われる処理
 	get_client_version()
@@ -149,8 +202,5 @@ function tap.reset()
 	local client_cipher_percentegaes = calculate_percentages(client_cipher_counts,total_cipher_count)
 
 	set_version_cipher()
-	for i in ipairs(version_list) do
-			output_file:write(string.format("%s,%s\n",version_list[i][3],version_list[i][4]))		
-	end
 	output_file:close()
 end
