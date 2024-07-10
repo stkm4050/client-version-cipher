@@ -27,7 +27,7 @@ local version_cipher_counts = {}
 local version_counts = {}
 
 local output_file = io.open(file_name, "w")
-output_file:write("SSHversion-Cipher,percentage\n")
+output_file:write("SSHversion,Cipher,percentage\n")
 
 --sshバージョンを取得する関数
 local function get_client_version()
@@ -122,21 +122,38 @@ end
 --割合の多い順に並び替える関数
 local function sort_percentages(percentages_table)
 	local sorted_percentages_table = {}
-	for key, percentage in pairs(percentages_table) do
-		table.insert(sorted_percentages_table, {key=key,percentage=percentage})
+	-- Iterate over percentages_table correctly
+	for version_key, data in pairs(percentages_table) do
+		if type(data) == "table" and #data == 2 then
+			local cipher_key = data[1]
+			local percentage = data[2]
+			-- Ensure no nil values are inserted
+			if cipher_key and percentage then
+				table.insert(sorted_percentages_table, {
+					version_key = version_key,
+					cipher_key = cipher_key,
+					percentage = percentage
+				})
+			end
+		end
 	end
-	table.sort(sorted_percentages_table, function(a,b) return a.percentage > b.percentage end)
+	-- Sort the table by percentage in descending order
+	table.sort(sorted_percentages_table, function(a, b) return a.percentage > b.percentage end)
 	return sorted_percentages_table
 end
 
 --クライアントバージョン毎のCipherの割合調査
-local function version_cipher_parcent()
+local function version_cipher_percent()
 	local percentages = {}
 	for versions_key, cipher_data in pairs(version_cipher_counts) do
         for cipher_key, counts in pairs(cipher_data) do
 			for version_key, count in pairs(version_counts) do
 				if versions_key == version_key then
-					percentages[version_key.."-"..cipher_key] = (counts/count)*100
+					if not percentages[version_key.."/"..cipher_key] then
+						percentages[version_key.."/"..cipher_key] = {}
+					end
+					percentages[version_key.."/"..cipher_key][1] = cipher_key
+					percentages[version_key.."/"..cipher_key][2] = (counts/count)*100
 				end
 			end
         end
@@ -144,7 +161,7 @@ local function version_cipher_parcent()
 	local newpercentages = sort_percentages(percentages)
 	for _, data in pairs(newpercentages) do
 		-- print(string.format("Version-cipher: %s, percent: %.2f\n",version,percent))
-		output_file:write(string.format("%s,%.2f\n",data.key,data.percentage))
+		output_file:write(string.format("%s,%s,%.2f\n",data.version_key,data.cipher_key,data.percentage))
 	end
 
 end
@@ -184,7 +201,7 @@ local function set_version_cipher()
 			end
 		end
 	end
-	version_cipher_parcent()
+	version_cipher_percent()
 end
 
 

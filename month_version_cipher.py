@@ -9,14 +9,15 @@ def calculate_ssh_and_cipher_percentages(directory_path):
     
     # データを格納する辞書を初期化
     ssh_versions = {}
-    ciphers = {}
+    version_ciphers = {}
+    ssh_versions_percentage = {}
 
     # 各CSVファイルを読み込んでデータを集計
     for file in csv_files:
         try:
             # CSVファイルを読み込む
             df = pd.read_csv(file)
-            #percentageの値をint化
+            # percentageの値をint化
             df['percentage'] = pd.to_numeric(df['percentage'], errors='coerce')
         except pd.errors.ParserError as e:
             print(f"エラーが発生しました: {file}")
@@ -24,26 +25,31 @@ def calculate_ssh_and_cipher_percentages(directory_path):
             continue  # エラーが発生したファイルをスキップ
 
         # SSH Versionの割合を集計
-        for index, row in df.iterrows():
-            ssh_version = row['SSHversion-Cipher']
+        for index, row in df.iterrows():  #
+            ssh_version = row['SSHversion']
+            version_cipher = ssh_version.split('/')
             ssh_percentage = row['percentage']
-            if ssh_version not in ssh_versions:
-                ssh_versions[ssh_version] = 0
-            ssh_versions[ssh_version] += ssh_percentage
+            if ssh_version not in version_ciphers:
+                version_ciphers[ssh_version] = 0
+            version_ciphers[ssh_version] += ssh_percentage
+            if version_cipher[0] not in ssh_versions:
+                ssh_versions[version_cipher[0]] = 0
+            ssh_versions[version_cipher[0]] += ssh_percentage
         
     # 全体の割合を計算
-    total_ssh_percentage = sum(ssh_versions.values())
+    for version_cipher in version_ciphers:
+        version = version_cipher.split('/')
+        for ssh_version in ssh_versions:
+            if version[0] == ssh_version:
+                ssh_versions_percentage[version_cipher] = version_ciphers[version_cipher] / ssh_versions[ssh_version] * 100
 
     # 全体の割合に対する個別割合を計算し、ソート
-    ssh_versions_percentage = {k: v / total_ssh_percentage * 100 for k, v in ssh_versions.items()}
     sorted_ssh_versions = sorted(ssh_versions_percentage.items(), key=lambda item: item[1], reverse=True)
 
-
     # 結果を表示
-    print("Version-cipher,percentage")
+    print("Version/Cipher,Percentage")
     for version, percentage in sorted_ssh_versions:
         print(f"{version},{percentage:.2f}")
-
 
 if __name__ == "__main__":
     # コマンドライン引数を処理するためのargparseを設定
