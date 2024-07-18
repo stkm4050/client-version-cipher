@@ -11,4 +11,7 @@ do
 	tshark -o "ssh.tcp.port:22" -X lua_script:get_ip_client.lua -X lua_script1:/home/kamada/packet/honey/port22-2024${month}${day}0000.dump -X lua_script1:22 -X lua_script1:/home/kamada/packet/csv/${month}/${month}${day}.csv -r /home/kamada/packet/honey/port22-2024${month}${day}0000.dump -q
 	scp honey:/home/koba/Research/dump-cririn/port22-2024${month}${day}0000.dump /home/kamada/packet/cririn
 	tshark -o "ssh.tcp.port:22" -X lua_script:get_ip_client.lua -X lua_script1:/home/kamada/packet/cririn/port22-2024${month}${day}0000.dump -X lua_script1:22 -X lua_script1:/home/kamada/packet/csv/${month}/${month}${day}_cririn.csv -r /home/kamada/packet/cririn/port22-2024${month}${day}0000.dump -q
+	tshark -o "ssh.tcp.port:22" -X lua_script:version_cipher.lua -X lua_script1:/home/kamada/packet/honey/port22-2024${month}${day}0000.dump -X lua_script1:22 -X lua_script1:/home/kamada/packet/csv/version-cipher/${month}/${month}${day}.csv -r /home/kamada/packet/honey/port22-2024${month}${day}0000.dump -q
+	tshark -o "ssh.tcp.port:22" -X lua_script:version_cipher.lua -X lua_script1:/home/kamada/packet/cririn/port22-2024${month}${day}0000.dump -X lua_script1:22 -X lua_script1:/home/kamada/packet/csv/version-cipher/${month}/${month}${day}_cririn.csv -r /home/kamada/packet/cririn/port22-2024${month}${day}0000.dump -q
+	
 done
